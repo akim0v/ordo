@@ -1,3 +1,9 @@
+// Example: factory_error
+//
+// A constructor may return (T, error). The graph here is valid, so the
+// container builds; the failure happens later, when the service is resolved and
+// the failing constructor actually runs. The error reaches the caller wrapped in
+// a *di.DependencyError naming both types involved.
 package main
 
 import (
@@ -9,6 +15,8 @@ import (
 )
 
 func main() {
+	// The graph is sound: UserService needs a UserRepository, and one is
+	// registered. Construction succeeds.
 	c, err := di.NewContainer(
 		di.WithService[UserRepository](NewUserRepositoryImpl),
 		di.WithFactory(NewUserService),
@@ -17,16 +25,20 @@ func main() {
 		log.Fatalf("could not create the container: %s", err)
 	}
 
+	// Resolution runs NewUserRepositoryImpl, which fails.
 	service, err := c.GetService[*UserService]()
-	var dependencyError *di.DependencyError
-	if err != nil && errors.As(err, &dependencyError) {
-		fmt.Println(
-			errors.Is(
-				errors.Unwrap(dependencyError),
-				errors.ErrUnsupported,
-			),
-		) // True
-	}
 
-	fmt.Println(service == nil) // True
+	fmt.Println(service == nil) // true
+	fmt.Println(err)
+	// di: failed to create dependency "main.UserRepository" for service
+	// "*main.UserService": database is unreachable
+
+	// The cause is preserved, so the original sentinel is still classifiable.
+	fmt.Println(errors.Is(err, ErrNoDatabase)) // true
+
+	// The wrapper names which dependency failed and who asked for it.
+	var depErr *di.DependencyError
+	if errors.As(err, &depErr) {
+		fmt.Printf("%s could not be built for %s\n", depErr.DependencyType, depErr.RequestingType)
+	}
 }

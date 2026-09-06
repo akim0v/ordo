@@ -39,4 +39,3 @@ func (service *UserService) CreateUser(name string) int {
 	service.repository.InsertUser(user)
 	return user.ID
 }
-

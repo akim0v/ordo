@@ -2,21 +2,20 @@ package main
 
 import "errors"
 
-type UserRepositoryImpl struct {
-	users map[int]User
-}
+// ErrNoDatabase stands in for the connection failure a real repository
+// constructor would report.
+var ErrNoDatabase = errors.New("database is unreachable")
+
+type UserRepositoryImpl struct{}
 
 var _ UserRepository = (*UserRepositoryImpl)(nil)
 
+// NewUserRepositoryImpl returns (T, error), the second supported factory shape.
+// Returning a non-nil error fails the resolution that needed this service.
 func NewUserRepositoryImpl() (*UserRepositoryImpl, error) {
-	return nil, errors.ErrUnsupported
+	return nil, ErrNoDatabase
 }
 
-func (ur *UserRepositoryImpl) GetUser(id int) (User, bool) {
-	user, ok := ur.users[id]
-	return user, ok
-}
-
-func (ur *UserRepositoryImpl) InsertUser(user User) {
-	ur.users[user.ID] = user
+func (ur *UserRepositoryImpl) GetUserName(int) (string, bool) {
+	return "", false
 }

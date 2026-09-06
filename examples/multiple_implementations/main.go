@@ -1,3 +1,8 @@
+// Example: multiple_implementations
+//
+// Registering one service type more than once is not a conflict. The container
+// keeps every registration, and a dependency declared as a slice receives all
+// of them in registration order.
 package main
 
 import (
@@ -10,10 +15,12 @@ import (
 
 func main() {
 	c, err := di.NewContainer(
-		// Register multiple implementations of UserRepository
+		// Two implementations of the same interface.
 		di.WithService[UserRepository](NewCacheRepositoryImpl),
 		di.WithService[UserRepository](NewDBRepositoryImpl),
-		// Factory automatically receives []UserRepository with all registered implementations
+
+		// NewUserService takes []UserRepository and receives both, in the order
+		// they were registered above.
 		di.WithFactory(NewUserService),
 	)
 	if err != nil {
@@ -29,9 +36,13 @@ func main() {
 	user := service.GetUser(userID)
 
 	fmt.Println("\n=== Fetching non-existent user ===")
-	user2 := service.GetUser(rand.Int())
+	missing := service.GetUser(rand.Int())
 
 	fmt.Println("\n=== Results ===")
 	fmt.Println(user.Name == "Akim") // true
-	fmt.Println(user2 == nil)        // true
+	fmt.Println(missing == nil)      // true
+
+	// Asking for the slice directly returns every registration; asking for the
+	// bare type returns the last one.
+	fmt.Println(len(c.MustGetService[[]UserRepository]())) // 2
 }
