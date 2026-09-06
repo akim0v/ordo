@@ -3,9 +3,20 @@ package ordo_test
 import (
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/akim0v/ordo"
 )
+
+// registeredAt matches the source location a verification fault carries.
+var registeredAt = regexp.MustCompile(` registered at \S+`)
+
+// withoutSite removes the "registered at file.go:12" a fault carries, so an
+// example's expected output does not depend on its own line numbers. Real
+// messages keep the location.
+func withoutSite(err error) string {
+	return registeredAt.ReplaceAllString(err.Error(), "")
+}
 
 // Config is a settings value the application builds itself.
 type Config struct {
@@ -100,7 +111,8 @@ func ExampleNew_missingDependency() {
 		ordo.WithFactory(NewUserService),
 	)
 
-	fmt.Println(err)
+	// The real message also names the registration's source location.
+	fmt.Println(withoutSite(err))
 	fmt.Println(errors.Is(err, ordo.ErrServiceNotFound))
 
 	// Output:
@@ -121,8 +133,8 @@ func ExampleNew_circularDependency() {
 		ordo.WithFactory(func(*Billing) *Accounts { return nil }),
 	)
 
-	var cycle *ordo.CircularDependencyError
-	fmt.Println(errors.As(err, &cycle))
+	cycle, ok := errors.AsType[*ordo.CircularDependencyError](err)
+	fmt.Println(ok)
 	fmt.Println(len(cycle.Cycle))
 
 	// Output:
@@ -137,8 +149,8 @@ func ExampleNew_registrationFault() {
 		ordo.WithFactory("not a function"),
 	)
 
-	var registration *ordo.RegistrationError
-	fmt.Println(errors.As(err, &registration))
+	_, ok := errors.AsType[*ordo.RegistrationError](err)
+	fmt.Println(ok)
 	fmt.Println(errors.Is(err, ordo.ErrFactoryNotFunction))
 
 	// Output:

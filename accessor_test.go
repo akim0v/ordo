@@ -25,7 +25,7 @@ func (suite *ServiceAccessorInstanceSuite) TestInstance() {
 	}
 	inst := reflect.ValueOf("instance")
 
-	accessor := newServiceAccessor(id, nil, nil, &inst)
+	accessor := newServiceAccessor(id, nil, nil, &inst, callSite{})
 
 	// Act
 	val1, err1 := accessor.Instance()
@@ -56,7 +56,7 @@ func (suite *ServiceAccessorInstanceSuite) TestFactory() {
 	})
 	suite.Require().NoError(factoryErr)
 
-	accessor := newServiceAccessor(id, nil, f, nil)
+	accessor := newServiceAccessor(id, nil, f, nil, callSite{})
 
 	// Act
 	val1, err1 := accessor.Instance()
@@ -87,7 +87,7 @@ func (suite *ServiceAccessorInstanceSuite) TestFactoryError() {
 	})
 	suite.Require().NoError(factoryErr)
 
-	accessor := newServiceAccessor(id, nil, f, nil)
+	accessor := newServiceAccessor(id, nil, f, nil, callSite{})
 
 	// Act
 	val1, err1 := accessor.Instance()

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -115,7 +116,7 @@ func (suite *InvalidRegistrationErrorSuite) TestMessageWithoutOptionalFields() {
 	msg := err.Error()
 
 	// Assert
-	suite.Equal("option 0: registration value is nil", msg)
+	suite.Equal("option 0: "+strings.TrimPrefix(ErrNilRegistration.Error(), "ordo: "), msg)
 }
 
 // TestUnwrapsCause tests the fault unwraps to its cause sentinel

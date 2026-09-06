@@ -1,5 +1,22 @@
 // Package ordo is a dependency injection container for Go.
 //
+// # Requires Go 1.27 or newer
+//
+// Services are resolved through generic methods, such as c.GetService[T]().
+// A method declaring its own type parameters became legal Go only in 1.27,
+// released 2026-08-19. On Go 1.26 and earlier the same call does not compile,
+// and the toolchain reports it at your call site rather than here:
+//
+//	./main.go:14:24: syntax error: method must have no type parameters
+//
+// That reads like a broken library. It is a toolchain mismatch. Run
+// "go version" before anything else, and see the go directive in go.mod.
+//
+// There is no build-tag fallback and no package-level resolver function. The
+// generic-method form is the API.
+//
+// # Overview
+//
 // Registration is explicit and generic, dependencies are read from constructor
 // parameter types, and the whole dependency graph is verified before New
 // returns. A container either fails to build, or is fully resolvable.
@@ -17,6 +34,66 @@
 // New never panics. A malformed option is returned as a *RegistrationError and
 // a broken graph as a *VerificationError, both aggregating every fault of the
 // call.
+//
+// # Choosing a registration option
+//
+// Ask what the container is being handed, and what type callers will ask for.
+//
+//   - The value already exists: WithValue. The service type is the value's own
+//     type.
+//   - A constructor, and callers ask for its concrete return type:
+//     WithFactory. The service type is inferred, and is never an interface.
+//   - A constructor or value, and callers ask for an interface it satisfies:
+//     WithService[Interface]. This is the only option that lets the service
+//     type differ from the concrete type, and it is the one to reach for when
+//     wiring an implementation behind a boundary.
+//
+// WithService accepts a constructor or a ready value and tells them apart by
+// kind, so WithService[T](v) covers both forms of WithValue and WithFactory.
+//
+// Passing a constructor to WithValue is a mistake the compiler cannot catch:
+// the type parameter is inferred as the function's own type, so the service
+// type becomes that function type. Registration rejects it with
+// ErrValueIsFunction. Use WithFactory, or WithService[T], for a constructor.
+//
+// # Common mistakes
+//
+// Generic methods are invisible to reflection and cannot satisfy an interface.
+// Every method on *Container declares its own type parameter, so
+// reflect.TypeOf(c).NumMethod() reports 0, and an interface cannot describe
+// them at all:
+//
+//	type Resolver interface {
+//		GetService[T any]() (T, error) // interface method must have no type parameters
+//	}
+//
+// There is no way to abstract *Container behind a user-defined resolver
+// interface. Depend on *Container directly, or — better — depend on the
+// services themselves and let the container do the wiring.
+//
+// Keys are a call-site facility only. A factory parameter is always resolved
+// without a key, so a keyed registration never satisfies a constructor
+// dependency. Registering only WithKeyedService[Cache]("redis", ...) and then
+// declaring a constructor that takes a Cache is a missing dependency, reported
+// by New. Register an unkeyed Cache for injection, resolve keyed ones at the
+// call site, or register both.
+//
+// Registering one service type more than once is not an error. The
+// registrations accumulate, and how you ask decides what you get:
+//
+//   - MustGetService[T]() returns the last registration.
+//   - MustGetService[[]T]() returns every registration, in registration order.
+//
+// A constructor whose parameter is []T likewise receives all of them. This is
+// how a set of handlers, middlewares or validators is collected.
+//
+// The container registers itself. *Container is always resolvable, and a
+// constructor may take one to resolve lazily at run time:
+//
+//	c.MustGetService[*ordo.Container]() == c // true
+//
+// Prefer declared parameters where you can; a constructor that takes the
+// container hides its real dependencies from verification.
 package ordo
 
 import (

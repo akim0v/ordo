@@ -14,7 +14,7 @@ system and into a convention you have to remember.
 Ordo takes the opposite position. Registration is a plain generic call:
 
 ```go
-ordo.WithService[UserRepository](storage.NewPostgresUserRepository)
+ordo.WithService[UserRepository](NewPostgresUserRepository)
 ```
 
 The compiler already knows the service type and the constructor. No tags, no code
@@ -45,50 +45,84 @@ Ordo requires **Go 1.27 or newer**.
 go get -u github.com/akim0v/ordo
 ```
 
+Services are resolved through generic methods — `c.GetService[T]()` — and a method could
+not declare its own type parameters until Go 1.27. On an older toolchain that call fails to
+compile at *your* call site, usually as `syntax error: method must have no type
+parameters`, which reads like a broken library rather than a version mismatch. If you see
+it, check `go version`. There is no build-tag fallback: the generic-method form is the API.
+
 ## Quickstart
+
+This program compiles and runs as written.
 
 ```go
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/akim0v/ordo"
-
-	"github.com/you/app/config"
-	"github.com/you/app/rest"
-	"github.com/you/app/storage"
-	"github.com/you/app/usecase"
 )
+
+// Config is built by the application and handed to the container as a value.
+type Config struct {
+	DSN string
+}
+
+// UserRepository is the interface the service layer depends on.
+type UserRepository interface {
+	Name() string
+}
+
+// PostgresUserRepository implements UserRepository and needs a *Config.
+type PostgresUserRepository struct {
+	dsn string
+}
+
+func NewPostgresUserRepository(cfg *Config) *PostgresUserRepository {
+	return &PostgresUserRepository{dsn: cfg.DSN}
+}
+
+func (r *PostgresUserRepository) Name() string { return "postgres(" + r.dsn + ")" }
+
+// UserService depends on the interface, never on the implementation.
+type UserService struct {
+	repository UserRepository
+}
+
+func NewUserService(repository UserRepository) *UserService {
+	return &UserService{repository: repository}
+}
+
+func (s *UserService) RepositoryName() string { return s.repository.Name() }
 
 func main() {
 	c, err := ordo.New(
-		// Register a constructor against the interface it satisfies.
-		// usecase.UserRepo is the interface usecase.NewUserService depends on;
-		// storage.NewUserRepo is the constructor that implements it.
-		ordo.WithService[usecase.UserRepo](storage.NewUserRepo),
+		// A ready value, registered under its own type, *Config.
+		ordo.WithValue(&Config{DSN: "localhost"}),
 
-		// Register a ready-made value under its own type.
-		// Equivalent to ordo.WithService[*config.Config](config.New()).
-		ordo.WithValue(config.New()),
+		// A constructor bound to the interface it satisfies. Its *Config
+		// parameter is supplied from the registration above.
+		ordo.WithService[UserRepository](NewPostgresUserRepository),
 
-		// Register a constructor under its return type.
-		// Equivalent to ordo.WithService[*usecase.UserService](usecase.NewUserService).
-		ordo.WithFactory(usecase.NewUserService),
-
-		// rest.NewUserController takes a *usecase.UserService; the container supplies it.
-		ordo.WithService[rest.Controller](rest.NewUserController),
+		// A constructor registered under its own return type, *UserService.
+		ordo.WithFactory(NewUserService),
 	)
 	if err != nil {
-		log.Fatalf("could not create the container: %s", err)
+		// The graph was verified before this point, so this error names the
+		// exact registration to change.
+		log.Fatal(err)
 	}
 
-	// Every service registered as a rest.Controller, in registration order.
-	for _, controller := range c.MustGetService[[]rest.Controller]() {
-		controller.Init(...)
-	}
+	service := c.MustGetService[*UserService]()
+	fmt.Println(service.RepositoryName())
+	// Output: postgres(localhost)
 }
 ```
+
+Every Go block in this README is compiled by `docscheck_test.go` in this repository, so
+none of them can rot.
 
 Runnable versions of this and other setups live in [`examples/`](./examples).
 
@@ -119,13 +153,21 @@ registrations, and a dependency declared as a slice receives all of them, in reg
 order:
 
 ```go
+// Given a second implementation, NewCacheUserRepository, and a consumer
+// NewReport whose parameter is []UserRepository:
 c, err := ordo.New(
-	ordo.WithService[UserRepository](NewCacheRepository),
-	ordo.WithService[UserRepository](NewDBRepository),
+	ordo.WithValue(&Config{DSN: "localhost"}),
+	ordo.WithService[UserRepository](NewPostgresUserRepository),
+	ordo.WithService[UserRepository](NewCacheUserRepository),
 
-	// NewUserService takes []UserRepository and receives both.
-	ordo.WithFactory(NewUserService),
+	// NewReport receives both implementations, in registration order.
+	ordo.WithFactory(NewReport),
 )
+if err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println(len(c.MustGetService[*Report]().Repositories()))
 ```
 
 The same works at the call site: `c.MustGetService[[]UserRepository]()` returns every
@@ -134,11 +176,18 @@ registration, while `c.MustGetService[UserRepository]()` returns the last one.
 ## Resolving services
 
 ```go
-svc, err := c.GetService[*usecase.UserService]()          // returns an error
-svc := c.MustGetService[*usecase.UserService]()           // panics on failure
+service, err := c.GetService[*UserService]() // returns an error
+fmt.Println(service.RepositoryName(), err)
 
-svc, err := c.GetKeyedService[Cache]("redis")
-svc := c.MustGetKeyedService[Cache]("redis")
+service = c.MustGetService[*UserService]() // panics on failure
+fmt.Println(service.RepositoryName())
+
+// Every registration of a type, in registration order.
+fmt.Println(len(c.MustGetService[[]UserRepository]()))
+
+// A keyed registration is resolved by name.
+cached, err := c.GetKeyedService[UserRepository]("cache")
+fmt.Println(cached, err)
 ```
 
 Services are resolved lazily and each registration is constructed once.
@@ -160,10 +209,16 @@ involved, and the `file:line` of the `ordo.With*` call that created it. Each fau
 of the exported sentinels:
 
 ```go
-var invalid *ordo.InvalidRegistrationError
+// Classify the cause with a sentinel.
+if errors.Is(err, ordo.ErrFactoryNotFunction) {
+	// a non-function was passed where a constructor was expected
+}
 
-if errors.Is(err, ordo.ErrFactoryNotFunction) { /* classify */ }
-if errors.As(err, &invalid) { /* read Site, ServiceType, ValueType */ }
+// Read the fault itself. errors.AsType is the Go 1.26+ form and is what this
+// package uses internally; it needs no out-parameter.
+if invalid, ok := errors.AsType[*ordo.InvalidRegistrationError](err); ok {
+	fmt.Println(invalid.Index, invalid.Site, invalid.ServiceType, invalid.ValueType)
+}
 ```
 
 | Sentinel | Cause |
@@ -174,6 +229,7 @@ if errors.As(err, &invalid) { /* read Site, ServiceType, ValueType */ }
 | `ErrFactoryTooManyReturns` | the factory returns more than two values |
 | `ErrFactorySecondReturnNotErr` | the factory's second return value is not an `error` |
 | `ErrNotAssignable` | the return type or instance is not assignable to the service type |
+| `ErrValueIsFunction` | a constructor was registered as a value, making the service type the function type |
 
 **Verification.** Once every registration is sound, the dependency graph is checked, and
 every missing dependency and every cycle is returned as a `*ordo.VerificationError`

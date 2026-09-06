@@ -54,6 +54,19 @@ func (opt *serviceFactoryOption) apply(c *Container) error {
 	}
 
 	if !f.ReturnType.AssignableTo(opt.typ) {
+		// The service type being the registered function's own type means it
+		// was inferred from that function, which is what WithValue does. The
+		// generic ErrNotAssignable message reads backwards here — it names the
+		// func type as the service and the return type as the offending value —
+		// so the cause names the option to use instead.
+		if opt.typ.Kind() == reflect.Func && reflect.TypeOf(opt.factory) == opt.typ {
+			return &InvalidRegistrationError{
+				ServiceType: opt.typ,
+				Site:        opt.site,
+				Err:         ErrValueIsFunction,
+			}
+		}
+
 		return &InvalidRegistrationError{
 			ServiceType: opt.typ,
 			ValueType:   f.ReturnType,
@@ -63,7 +76,7 @@ func (opt *serviceFactoryOption) apply(c *Container) error {
 	}
 
 	id := newServiceIdentifier(opt.typ, opt.key)
-	accessor := newServiceAccessor(id, c, f, nil)
+	accessor := newServiceAccessor(id, c, f, nil, opt.site)
 	c.appendAccessor(id, accessor)
 
 	return nil
@@ -109,7 +122,7 @@ func (opt *serviceInstanceOption) apply(c *Container) error {
 	}
 
 	id := newServiceIdentifier(opt.typ, opt.key)
-	accessor := newServiceAccessor(id, c, nil, &instVal)
+	accessor := newServiceAccessor(id, c, nil, &instVal, opt.site)
 	c.appendAccessor(id, accessor)
 
 	return nil
@@ -187,7 +200,7 @@ func (opt *factoryOption) apply(c *Container) error {
 	}
 
 	id := newServiceIdentifier(f.ReturnType, opt.key)
-	accessor := newServiceAccessor(id, c, f, nil)
+	accessor := newServiceAccessor(id, c, f, nil, opt.site)
 	c.appendAccessor(id, accessor)
 
 	return nil

@@ -31,6 +31,11 @@ type serviceAccessor struct {
 	// nil if the service instance has not been requested yet
 	// or an error did not occur while creating the instance
 	err error
+
+	// site is the source location of the registration that created the
+	// accessor, so a verification fault can name the call to change.
+	// Zero for the Container's registration of itself
+	site callSite
 }
 
 // newServiceAccessor creates a new serviceAccessor
@@ -39,12 +44,14 @@ func newServiceAccessor(
 	c *Container,
 	f *serviceFactory,
 	inst *reflect.Value,
+	site callSite,
 ) *serviceAccessor {
 	return &serviceAccessor{
 		id:       id,
 		cont:     c,
 		factory:  f,
 		instance: inst,
+		site:     site,
 	}
 }
 

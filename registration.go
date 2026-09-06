@@ -33,6 +33,13 @@ var (
 	// ErrNotAssignable is the cause of a registration fault reporting a factory
 	// return type or an instance type that is not assignable to the service type
 	ErrNotAssignable = errors.New("ordo: value is not assignable to the service type")
+
+	// ErrValueIsFunction is the cause of a registration fault reporting a
+	// constructor passed to an option that infers the service type from its
+	// argument, such as WithValue. The type parameter is inferred as the
+	// function's own type, so the constructor is registered as a service of
+	// type func(...) ... rather than of the type it returns
+	ErrValueIsFunction = errors.New("ordo: function registered as a value")
 )
 
 // callSite is the source location of the call that created a registration

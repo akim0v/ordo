@@ -26,11 +26,11 @@ func ExampleContainer_GetService() {
 	// true
 }
 
-// ExampleContainer_GetService_multipleImplementations shows that registering one
+// ExampleContainer_GetService_slice shows that registering one
 // service type more than once is not a conflict. Asking for the slice returns
 // every registration in registration order; asking for the bare type returns the
 // last one.
-func ExampleContainer_GetService_multipleImplementations() {
+func ExampleContainer_GetService_slice() {
 	c, _ := ordo.New(
 		ordo.WithValue(&Config{DSN: "localhost"}),
 		ordo.WithService[UserRepository](NewCacheRepository),
@@ -129,8 +129,7 @@ func ExampleDependencyError() {
 	// The cause is preserved, and the wrapper names both types involved.
 	fmt.Println(errors.Is(err, unreachable))
 
-	var dependency *ordo.DependencyError
-	if errors.As(err, &dependency) {
+	if dependency, ok := errors.AsType[*ordo.DependencyError](err); ok {
 		fmt.Println(dependency.DependencyType, dependency.RequestingType)
 	}
 
@@ -152,11 +151,10 @@ func ExampleVerificationError() {
 		ordo.WithFactory(func(*Orphan) *Config { return nil }),
 	)
 
-	var verification *ordo.VerificationError
-	if errors.As(err, &verification) {
+	if verification, ok := errors.AsType[*ordo.VerificationError](err); ok {
 		fmt.Println(len(verification.Faults))
 		for _, fault := range verification.Faults {
-			fmt.Println(fault)
+			fmt.Println(withoutSite(fault))
 		}
 	}
 
@@ -174,8 +172,7 @@ func ExampleMissingDependencyError() {
 		ordo.WithFactory(NewUserService),
 	)
 
-	var missing *ordo.MissingDependencyError
-	if errors.As(err, &missing) {
+	if missing, ok := errors.AsType[*ordo.MissingDependencyError](err); ok {
 		fmt.Println(missing.RequestingType)
 		fmt.Println(missing.DependencyType)
 	}
@@ -199,8 +196,7 @@ func ExampleCircularDependencyError() {
 		ordo.WithFactory(func(*Billing) *Accounts { return nil }),
 	)
 
-	var cycle *ordo.CircularDependencyError
-	if errors.As(err, &cycle) {
+	if cycle, ok := errors.AsType[*ordo.CircularDependencyError](err); ok {
 		for i, typ := range cycle.Cycle {
 			fmt.Println(i, typ)
 		}
@@ -222,8 +218,7 @@ func ExampleRegistrationError() {
 		ordo.WithService[UserRepository](42),
 	)
 
-	var registration *ordo.RegistrationError
-	if errors.As(err, &registration) {
+	if registration, ok := errors.AsType[*ordo.RegistrationError](err); ok {
 		fmt.Println(len(registration.Faults))
 	}
 
@@ -232,8 +227,8 @@ func ExampleRegistrationError() {
 	fmt.Println(errors.Is(err, ordo.ErrNotAssignable))
 
 	// Verification is skipped entirely.
-	var verification *ordo.VerificationError
-	fmt.Println(errors.As(err, &verification))
+	_, verified := errors.AsType[*ordo.VerificationError](err)
+	fmt.Println(verified)
 
 	// Output:
 	// 3
@@ -252,8 +247,7 @@ func ExampleInvalidRegistrationError() {
 		ordo.WithService[UserRepository](42),
 	)
 
-	var invalid *ordo.InvalidRegistrationError
-	if errors.As(err, &invalid) {
+	if invalid, ok := errors.AsType[*ordo.InvalidRegistrationError](err); ok {
 		fmt.Println(invalid.Index)
 		fmt.Println(invalid.ServiceType)
 		fmt.Println(invalid.ValueType)
@@ -265,4 +259,34 @@ func ExampleInvalidRegistrationError() {
 	// ordo_test.UserRepository
 	// int
 	// true
+}
+
+// ExampleMissingDependencyError_keyed shows a dependency that is registered,
+// but only under a key. Keys are a call-site facility: a factory parameter is
+// always resolved without one, so the dependency is genuinely missing and
+// verification reports it.
+func ExampleMissingDependencyError_keyed() {
+	_, err := ordo.New(
+		// A Cache exists, but only under a key.
+		ordo.WithKeyedService[UserRepository]("cache", NewCacheRepository),
+
+		// NewUserService takes a plain UserRepository parameter.
+		ordo.WithFactory(NewUserService),
+	)
+
+	fmt.Println(withoutSite(err))
+
+	// It is a plain missing dependency, and classifies as one.
+	_, ok := errors.AsType[*ordo.MissingDependencyError](err)
+	fmt.Println(ok)
+
+	// The keyed registration is still resolvable at the call site.
+	c, _ := ordo.New(ordo.WithKeyedService[UserRepository]("cache", NewCacheRepository))
+	fmt.Println(c.MustGetKeyedService[UserRepository]("cache").Name())
+
+	// Output:
+	// ordo: container verification failed:
+	//   - service "*ordo_test.UserService" requires "ordo_test.UserRepository", which is not registered
+	// true
+	// cache
 }

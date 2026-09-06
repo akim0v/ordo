@@ -18,15 +18,22 @@ type MissingDependencyError struct {
 
 	// DependencyType is the type of the dependency that is not registered
 	DependencyType reflect.Type
+
+	// RequestingSite is the source location of the registration that declared
+	// the dependency.
+	// Zero if the registration captured no call site
+	RequestingSite callSite
 }
 
 // Error implements the error interface for MissingDependencyError.
 func (e *MissingDependencyError) Error() string {
-	return fmt.Sprintf(
-		"service %q requires %q, which is not registered",
-		e.RequestingType,
-		e.DependencyType,
-	)
+	if e.RequestingSite.IsZero() {
+		return fmt.Sprintf("service %q requires %q, which is not registered",
+			e.RequestingType, e.DependencyType)
+	}
+
+	return fmt.Sprintf("service %q registered at %s requires %q, which is not registered",
+		e.RequestingType, e.RequestingSite, e.DependencyType)
 }
 
 // Unwrap returns ErrServiceNotFound, the sentinel a failed runtime resolution
@@ -302,6 +309,7 @@ func (g *dependencyGraph) walk() []error {
 				faults = append(faults, &MissingDependencyError{
 					RequestingType: nodeType(node),
 					DependencyType: edge.DependencyType,
+					RequestingSite: node.site,
 				})
 			}
 		}
