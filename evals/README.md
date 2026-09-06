@@ -54,6 +54,47 @@ of the exercise: it names the message or the missing document that has to improv
 The agent compiles against a snapshot of the library with `evals/` removed, so it cannot
 read the reference solutions through the `replace` directive.
 
+## Results
+
+Run on 2026-09-06 against `claude-sonnet-5`, at commit `d4d3a5b`, with
+`ORDO_EVAL_ROUNDS=1` and `ORDO_EVAL_TIMEOUT=300`.
+
+| task | first attempt | iterations | final | stall cause |
+| --- | --- | --- | --- | --- |
+| `01-interface-binding` | yes | 0 | pass | — |
+| `02-config-and-dependency` | yes | 0 | pass | — |
+| `03-constructor-error` | yes | 0 | pass | — |
+| `04-slice-consumer` | yes | 0 | pass | — |
+| `05-resolve-all-and-last` | yes | 0 | pass | — |
+| `06-keyed` | yes | 0 | pass | — |
+| `07-missing-dependency` | yes | 0 | pass | — |
+| `08-cycle` | yes | 0 | pass | — |
+| `09-classify-failure` | yes | 0 | pass | — |
+| `10-mock-in-test` | yes | 0 | pass | — |
+
+**first-attempt pass rate: 10/10**
+
+The generic-method API was expected to be the obstacle, since a method could not
+declare its own type parameters before Go 1.27 and no model was trained on code
+that does. It was not. Nothing in this run stalled on `c.GetService[T]()`.
+
+What did matter was whether the agent could read the package at all. In earlier runs
+the library snapshot sat outside the agent's sandbox, so it could reach neither the
+source nor `go doc`; it guessed the API as `Provide` and `Bind` and produced nothing
+that compiled. Vendoring the snapshot into the workspace changed the result from
+unusable to 10/10 with no compiler round-trips. The documentation carries the API.
+
+### How much to read into this
+
+- One model, one run. Every cell is a single sample.
+- The vendored snapshot includes `examples/`, which contains wiring close to several
+  tasks. A published module carries `examples/` into the module cache too, so this
+  matches what a real consumer has — but it means a task may be answered from an
+  example rather than from `go doc`. Excluding `examples/` would isolate the package
+  documentation specifically, and is the sharper experiment.
+- Passing workspaces are deleted, so the code behind a pass is not retained for
+  inspection. Only failures are kept.
+
 ## Keeping the suite honest
 
 `./evals/verify-reference.sh` builds and tests every task against its reference solution. It
