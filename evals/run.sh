@@ -17,6 +17,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL="${ORDO_EVAL_MODEL:-sonnet}"
 ROUNDS="${ORDO_EVAL_ROUNDS:-3}"
 RESULTS="$(mktemp -d)/results.tsv"
+KEPT="$(dirname "$RESULTS")/kept-workspaces.txt"
 
 # The library the tasks compile against is a snapshot with evals/ removed, so an
 # agent cannot read the reference solutions through the replace directive.
@@ -101,7 +102,15 @@ $output"
 
   printf '%s\t%s\t%s\t%s\t%s\n' "$slug" "$first" "$iterations" "$final" "$detail" >> "$RESULTS"
   printf '    %s after %s iteration(s)\n' "$final" "$iterations"
-  rm -rf "$work"
+
+  # A failed workspace is kept: the code the agent actually wrote says more
+  # about why it stalled than the last line of compiler output does.
+  if [[ "$final" == "pass" ]]; then
+    rm -rf "$work"
+  else
+    printf '    workspace kept at %s\n' "$work"
+    echo "$work" >> "$KEPT"
+  fi
 done
 
 echo
