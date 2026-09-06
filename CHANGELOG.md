@@ -7,11 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1]
+
+No library behaviour changes. Tests and tooling only.
+
 ### Added
 
 - Tests covering `ErrValueIsFunction`, including that a function which cannot be a factory
   at all keeps the cause describing why, and that an explicit service type still reports
-  `ErrNotAssignable`.
+  `ErrNotAssignable`. Package coverage 97.3% to 97.8%.
+
+### Changed
+
+- The eval runner keeps a failed task's workspace, writes each agent call's output to
+  `agent-round<n>.log`, and kills a call that exceeds `ORDO_EVAL_TIMEOUT` seconds.
 
 ## [0.1.0]
 
@@ -42,5 +51,6 @@ First tagged release.
 
 - Go 1.27 or newer. Resolution uses generic methods, which are not valid Go before 1.27.
 
-[Unreleased]: https://github.com/akim0v/ordo/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/akim0v/ordo/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/akim0v/ordo/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/akim0v/ordo/releases/tag/v0.1.0
