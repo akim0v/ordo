@@ -1,6 +1,7 @@
 package ordo
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -277,4 +278,88 @@ func TestMultiple(t *testing.T) {
 		assert.Equal(t, inst2, res[1].instance.Interface())
 		assert.Equal(t, inst1, res[0].instance.Interface())
 	}
+}
+
+// ValueIsFunctionSuite is the suite for the fault reported when a constructor
+// is registered through an option that infers the service type from its
+// argument.
+type ValueIsFunctionSuite struct {
+	suite.Suite
+}
+
+// TestConstructorThroughWithValue tests a constructor passed to WithValue is
+// reported as a function registered as a value.
+//
+// The service type is inferred as the function's own type, so the generic
+// ErrNotAssignable message would name the func type as the service and the
+// return type as the offending value, which reads backwards.
+func (suite *ValueIsFunctionSuite) TestConstructorThroughWithValue() {
+	// Arrange
+	newRepository := func() *testRepositoryImpl { return &testRepositoryImpl{} }
+
+	// Act
+	c, err := New(WithValue(newRepository))
+
+	// Assert
+	suite.Require().Error(err)
+	suite.Nil(c)
+	suite.ErrorIs(err, ErrValueIsFunction)
+	suite.NotErrorIs(err, ErrNotAssignable)
+
+	invalid, ok := errors.AsType[*InvalidRegistrationError](err)
+	suite.Require().True(ok)
+	suite.Equal(0, invalid.Index)
+	suite.Equal(reflect.TypeOf(newRepository), invalid.ServiceType)
+
+	// The value type is omitted: naming it would repeat the service type
+	suite.Nil(invalid.ValueType)
+}
+
+// TestKeyedValueReportsTheSameFault tests the keyed form is reported the same
+// way, since it infers the service type from its argument too.
+func (suite *ValueIsFunctionSuite) TestKeyedValueReportsTheSameFault() {
+	// Arrange
+	newRepository := func() *testRepositoryImpl { return &testRepositoryImpl{} }
+
+	// Act
+	_, err := New(WithKeyedValue("primary", newRepository))
+
+	// Assert
+	suite.ErrorIs(err, ErrValueIsFunction)
+}
+
+// TestMalformedFactoryKeepsItsOwnCause tests the fault is only reported once
+// the function is a usable factory shape.
+//
+// A function that cannot be a factory at all is rejected earlier and keeps the
+// cause describing why, rather than being reported as a value registration.
+func (suite *ValueIsFunctionSuite) TestMalformedFactoryKeepsItsOwnCause() {
+	// Arrange
+	returnsNothing := func() {}
+
+	// Act
+	_, err := New(WithValue(returnsNothing))
+
+	// Assert
+	suite.ErrorIs(err, ErrFactoryNoReturn)
+	suite.NotErrorIs(err, ErrValueIsFunction)
+}
+
+// TestExplicitServiceTypeIsUnaffected tests a constructor registered with an
+// explicit service type still reports an unassignable value, since the service
+// type was not inferred from the argument.
+func (suite *ValueIsFunctionSuite) TestExplicitServiceTypeIsUnaffected() {
+	// Arrange
+	notARepository := func() *testLoggerImpl { return &testLoggerImpl{} }
+
+	// Act
+	_, err := New(WithService[testRepository](notARepository))
+
+	// Assert
+	suite.ErrorIs(err, ErrNotAssignable)
+	suite.NotErrorIs(err, ErrValueIsFunction)
+}
+
+func TestValueIsFunction(t *testing.T) {
+	suite.Run(t, new(ValueIsFunctionSuite))
 }

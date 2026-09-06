@@ -7,6 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Tests covering `ErrValueIsFunction`, including that a function which cannot be a factory
+  at all keeps the cause describing why, and that an explicit service type still reports
+  `ErrNotAssignable`.
+
 ## [0.1.0]
 
 First tagged release.
