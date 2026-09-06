@@ -74,6 +74,11 @@ Run on 2026-09-06 against `claude-sonnet-5`, at commit `0f98f4b`, with
 
 **first-attempt pass rate: 10/10**
 
+The run was repeated with `ORDO_EVAL_NO_EXAMPLES=1`, which drops the runnable
+programs under `examples/` from the snapshot and leaves the package documentation,
+the godoc examples and the README. The result was identical: **10/10, zero repair
+rounds**. The sample programs are not what carries the API.
+
 The generic-method API was expected to be the obstacle, since a method could not
 declare its own type parameters before Go 1.27 and no model was trained on code
 that does. It was not. Nothing in this run stalled on `c.GetService[T]()`.
@@ -86,12 +91,10 @@ unusable to 10/10 with no compiler round-trips. The documentation carries the AP
 
 ### How much to read into this
 
-- One model, one run. Every cell is a single sample.
-- The vendored snapshot includes `examples/`, which contains wiring close to several
-  tasks. A published module carries `examples/` into the module cache too, so this
-  matches what a real consumer has — but it means a task may be answered from an
-  example rather than from `go doc`. Excluding `examples/` would isolate the package
-  documentation specifically, and is the sharper experiment.
+- Both runs are single samples per task, against one model.
+- Every task passed with no compiler round-trips, in both configurations, so the
+  suite currently has no discriminating power: it cannot tell a good change from a
+  bad one. Harder tasks are needed before it can guide the documentation.
 - Passing workspaces are deleted, so the code behind a pass is not retained for
   inspection. Only failures are kept.
 

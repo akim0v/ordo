@@ -11,6 +11,8 @@
 #   ORDO_EVAL_MODEL   model passed to the default agent      (default: sonnet)
 #   ORDO_EVAL_ROUNDS  repair rounds after the first attempt  (default: 3)
 #   ORDO_EVAL_TIMEOUT seconds before an agent call is killed    (default: 300)
+#   ORDO_EVAL_NO_EXAMPLES  set to 1 to drop examples/ from the snapshot, so the
+#                          agent has only the package documentation to work from
 
 set -uo pipefail
 
@@ -18,6 +20,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL="${ORDO_EVAL_MODEL:-sonnet}"
 ROUNDS="${ORDO_EVAL_ROUNDS:-3}"
 TIMEOUT="${ORDO_EVAL_TIMEOUT:-300}"
+NO_EXAMPLES="${ORDO_EVAL_NO_EXAMPLES:-0}"
 RESULTS="$(mktemp -d)/results.tsv"
 KEPT="$(dirname "$RESULTS")/kept-workspaces.txt"
 
@@ -28,8 +31,18 @@ KEPT="$(dirname "$RESULTS")/kept-workspaces.txt"
 # package documentation is not being measured on the documentation.
 SNAPSHOT="$(mktemp -d)/ordo"
 mkdir -p "$SNAPSHOT"
-tar -C "$REPO" --exclude=evals --exclude=.git --exclude=.idea --exclude=.claude -cf - . \
-  | tar -C "$SNAPSHOT" -xf -
+
+# The runnable programs under examples/ show wiring close to several tasks. A
+# published module carries them into the module cache, so they are present by
+# default; dropping them leaves only the package documentation and the godoc
+# examples, which is the sharper test of the documentation itself.
+snapshot_excludes=(--exclude=evals --exclude=.git --exclude=.idea --exclude=.claude)
+if [[ "$NO_EXAMPLES" == "1" ]]; then
+  snapshot_excludes+=(--exclude=examples)
+  echo "snapshot: examples/ excluded"
+fi
+
+tar -C "$REPO" "${snapshot_excludes[@]}" -cf - . | tar -C "$SNAPSHOT" -xf -
 
 # run_with_timeout runs a command in the background and kills it after N
 # seconds. macOS ships no timeout(1), so this is done by hand.
