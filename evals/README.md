@@ -56,7 +56,7 @@ read the reference solutions through the `replace` directive.
 
 ## Results
 
-Run on 2026-09-06 against `claude-sonnet-5`, at commit `d4d3a5b`, with
+Run on 2026-09-06 against `claude-sonnet-5`, at commit `0f98f4b`, with
 `ORDO_EVAL_ROUNDS=1` and `ORDO_EVAL_TIMEOUT=300`.
 
 | task | first attempt | iterations | final | stall cause |
