@@ -10,12 +10,14 @@
 #   ORDO_EVAL_AGENT   command receiving the prompt on stdin, run in the workspace
 #   ORDO_EVAL_MODEL   model passed to the default agent      (default: sonnet)
 #   ORDO_EVAL_ROUNDS  repair rounds after the first attempt  (default: 3)
+#   ORDO_EVAL_TIMEOUT seconds before an agent call is killed    (default: 300)
 
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL="${ORDO_EVAL_MODEL:-sonnet}"
 ROUNDS="${ORDO_EVAL_ROUNDS:-3}"
+TIMEOUT="${ORDO_EVAL_TIMEOUT:-300}"
 RESULTS="$(mktemp -d)/results.tsv"
 KEPT="$(dirname "$RESULTS")/kept-workspaces.txt"
 
@@ -25,6 +27,22 @@ SNAPSHOT="$(mktemp -d)/ordo"
 mkdir -p "$SNAPSHOT"
 tar -C "$REPO" --exclude=evals --exclude=.git --exclude=.idea --exclude=.claude -cf - . \
   | tar -C "$SNAPSHOT" -xf -
+
+# run_with_timeout runs a command in the background and kills it after N
+# seconds. macOS ships no timeout(1), so this is done by hand.
+run_with_timeout() {
+  local seconds="$1"; shift
+  "$@" &
+  local pid=$!
+
+  ( sleep "$seconds"; kill -TERM "$pid" 2>/dev/null ) &
+  local watchdog=$!
+
+  wait "$pid" 2>/dev/null
+  local status=$?
+  kill -TERM "$watchdog" 2>/dev/null
+  return "$status"
+}
 
 agent() {
   if [[ -n "${ORDO_EVAL_AGENT:-}" ]]; then
@@ -80,7 +98,15 @@ GOMOD
   first="no"; iterations=0; final="fail"; detail=""
 
   for (( round=0; round<=ROUNDS; round++ )); do
-    ( cd "$work" && printf '%s\n' "$prompt" | agent ) >/dev/null 2>&1
+    # The agent's output is kept rather than discarded: when a task fails it is
+    # the only evidence of whether the agent stalled, errored or ran out of turns.
+    ( cd "$work" && printf '%s\n' "$prompt" | run_with_timeout "$TIMEOUT" agent ) \
+      > "$work/agent-round$round.log" 2>&1
+    agent_status=$?
+
+    if [[ $agent_status -ne 0 ]]; then
+      printf '    agent exited %s on round %s\n' "$agent_status" "$round"
+    fi
 
     if output="$(grade "$work" "$task" 2>&1)"; then
       final="pass"
