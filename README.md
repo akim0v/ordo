@@ -1,5 +1,10 @@
 # Ordo
 
+[![CI](https://github.com/akim0v/ordo/actions/workflows/ci.yml/badge.svg)](https://github.com/akim0v/ordo/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/akim0v/ordo.svg)](https://pkg.go.dev/github.com/akim0v/ordo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/akim0v/ordo)](https://goreportcard.com/report/github.com/akim0v/ordo)
+[![Go 1.27+](https://img.shields.io/badge/go-1.27%2B-00ADD8)](https://go.dev/dl/)
+
 **Ordo** is a dependency injection container for Go. Wiring is explicit, dependencies are
 read from your constructors, and the whole graph is verified before the container hands you
 anything.
@@ -31,6 +36,8 @@ resolvable.** Nothing is deferred to the first request in production.
 
 In practice:
 
+- No third-party runtime dependencies. `go list -deps` on the library returns the standard
+  library and nothing else.
 - No code generation and no build step.
 - No struct tags and no reflection-driven field injection.
 - `ordo.New` never panics. Failures are ordinary Go errors, classified with `errors.Is` and
@@ -242,6 +249,16 @@ graph and would report dependencies missing only because of it.
 
 Ordo does one thing — dependency injection — and is not growing into a web framework. The
 API is settling but not yet frozen, so pin a version.
+
+## Contributing
+
+`go test ./...` covers the library, the runnable examples and every Go block in this README.
+CI additionally runs the tests under `-race`, checks `gofmt`, runs each program in
+`examples/`, and verifies that every task in [`evals/`](./evals) still passes against its
+reference solution.
+
+`evals/` measures whether an AI coding agent can use the library correctly on the first
+attempt; see [its README](./evals/README.md) for how to run it against a model.
 
 ## License
 

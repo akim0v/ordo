@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # Generic methods require 1.27; go.mod refuses to build on less.
+          go-version: '1.27.x'
+          check-latest: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l . )"
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      # Examples assert their own output, so this also verifies the
+      # documentation, and docscheck_test.go compiles every README block.
+      - name: test
+        run: go test -race -count=1 ./...
+
+      - name: examples run
+        run: |
+          for dir in examples/*/; do
+            echo "--- $dir"
+            go run "./$dir" > /dev/null
+          done
+
+  evals:
+    name: eval tasks are solvable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+
+      # No agent runs in CI. This proves every task remains well-posed against
+      # the current library, so a red eval is a model result and not a bit-rotted
+      # fixture.
+      - name: reference solutions still pass
+        run: ./evals/verify-reference.sh

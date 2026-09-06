@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
 // WithServiceSuite is the suite for testing the WithService function
 type WithServiceSuite struct {
 	suite.Suite

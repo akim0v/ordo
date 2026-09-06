@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 )
+
 // NewSuite is the suite for testing the New function
 type NewSuite struct {
 	suite.Suite
