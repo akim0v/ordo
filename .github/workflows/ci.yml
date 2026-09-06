@@ -14,9 +14,9 @@ jobs:
     name: build, vet and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           # Generic methods require 1.27; go.mod refuses to build on less.
           go-version: '1.27.x'
@@ -53,9 +53,9 @@ jobs:
     name: eval tasks are solvable
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
           check-latest: true
