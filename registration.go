@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"errors"
@@ -12,27 +12,27 @@ import (
 var (
 	// ErrNilRegistration is the cause of a registration fault reporting a nil
 	// factory or instance argument
-	ErrNilRegistration = errors.New("di: registration value is nil")
+	ErrNilRegistration = errors.New("ordo: registration value is nil")
 
 	// ErrFactoryNotFunction is the cause of a registration fault reporting a
 	// factory argument that is not a function
-	ErrFactoryNotFunction = errors.New("di: service factory must be a function")
+	ErrFactoryNotFunction = errors.New("ordo: service factory must be a function")
 
 	// ErrFactoryNoReturn is the cause of a registration fault reporting a
 	// factory returning no value
-	ErrFactoryNoReturn = errors.New("di: service factory must return at least one value")
+	ErrFactoryNoReturn = errors.New("ordo: service factory must return at least one value")
 
 	// ErrFactoryTooManyReturns is the cause of a registration fault reporting a
 	// factory returning more than two values
-	ErrFactoryTooManyReturns = errors.New("di: service factory returns too many values")
+	ErrFactoryTooManyReturns = errors.New("ordo: service factory returns too many values")
 
 	// ErrFactorySecondReturnNotErr is the cause of a registration fault
 	// reporting a factory whose second return value is not an error
-	ErrFactorySecondReturnNotErr = errors.New("di: second service factory return value must be an error")
+	ErrFactorySecondReturnNotErr = errors.New("ordo: second service factory return value must be an error")
 
 	// ErrNotAssignable is the cause of a registration fault reporting a factory
 	// return type or an instance type that is not assignable to the service type
-	ErrNotAssignable = errors.New("di: value is not assignable to the service type")
+	ErrNotAssignable = errors.New("ordo: value is not assignable to the service type")
 )
 
 // callSite is the source location of the call that created a registration
@@ -81,7 +81,7 @@ func (site callSite) String() string {
 // cause of a fault, and errors.As reads the registration it came from.
 type InvalidRegistrationError struct {
 	// Index is the position of the registration among the options passed to
-	// NewContainer
+	// New
 	Index int
 
 	// ServiceType is the declared service type of the registration.
@@ -115,7 +115,7 @@ func (e *InvalidRegistrationError) Error() string {
 
 	// The cause is already prefixed with the package name by the aggregate
 	// header, so it is trimmed here to keep the fault line readable
-	fmt.Fprintf(&sb, ": %s", strings.TrimPrefix(e.Err.Error(), "di: "))
+	fmt.Fprintf(&sb, ": %s", strings.TrimPrefix(e.Err.Error(), "ordo: "))
 
 	if e.ValueType != nil {
 		fmt.Fprintf(&sb, ", got %q", e.ValueType)
@@ -129,7 +129,7 @@ func (e *InvalidRegistrationError) Unwrap() error {
 	return e.Err
 }
 
-// RegistrationError is the error returned by NewContainer when one or more
+// RegistrationError is the error returned by New when one or more
 // registrations are malformed.
 //
 // It aggregates every fault found while applying the options, the same way
@@ -148,7 +148,7 @@ type RegistrationError struct {
 // Error implements the error interface for RegistrationError.
 func (e *RegistrationError) Error() string {
 	var sb strings.Builder
-	sb.WriteString("di: container registration failed:")
+	sb.WriteString("ordo: container registration failed:")
 
 	for _, fault := range e.Faults {
 		sb.WriteString("\n  - ")

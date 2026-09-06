@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"github.com/stretchr/testify/suite"

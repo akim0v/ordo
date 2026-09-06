@@ -16,26 +16,26 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/akim0v/ordo/di"
+	"github.com/akim0v/ordo"
 )
 
 func main() {
-	c, err := di.NewContainer(
+	c, err := ordo.New(
 		// Config is already built, so it is registered as a value under its own
 		// type, *Config. Anything asking for a *Config receives this one.
-		di.WithValue(LoadConfig()),
+		ordo.WithValue(LoadConfig()),
 
 		// The implementation is bound to the interface the usecase layer
 		// depends on, so nothing above storage names InMemoryUserRepository.
-		di.WithService[UserRepository](NewInMemoryUserRepository),
+		ordo.WithService[UserRepository](NewInMemoryUserRepository),
 
 		// Registered under its return type, *UserService.
-		di.WithFactory(NewUserService),
+		ordo.WithFactory(NewUserService),
 
 		// Both controllers are bound to Controller, so both land in the
 		// []Controller dependency below.
-		di.WithService[Controller](NewUserController),
-		di.WithService[Controller](NewHealthController),
+		ordo.WithService[Controller](NewUserController),
+		ordo.WithService[Controller](NewHealthController),
 	)
 	if err != nil {
 		// The graph was verified before this point. Reaching here means the

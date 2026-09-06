@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const registrationTestFile = "registration_test.go"
 
 // badRegistrationFromHelper returns a malformed registration created away from
-// the NewContainer call, together with the line the registration was created on
+// the New call, together with the line the registration was created on
 func badRegistrationFromHelper() (Option, int) {
 	opt := WithService[testRepository]("not a factory")
 	_, _, line, _ := runtime.Caller(0)
@@ -87,7 +87,7 @@ func (suite *InvalidRegistrationErrorSuite) TestMessage() {
 		Index:       3,
 		ServiceType: reflect.TypeFor[testRepository](),
 		ValueType:   reflect.TypeFor[string](),
-		Site:        callSite{File: "/src/di/main.go", Line: 42},
+		Site:        callSite{File: "/src/ordo/main.go", Line: 42},
 		Err:         ErrFactoryNotFunction,
 	}
 
@@ -97,7 +97,7 @@ func (suite *InvalidRegistrationErrorSuite) TestMessage() {
 	// Assert
 	suite.Contains(msg, "option 3")
 	suite.Contains(msg, "main.go:42")
-	suite.Contains(msg, "di.testRepository")
+	suite.Contains(msg, "ordo.testRepository")
 	suite.Contains(msg, "string")
 	suite.Contains(msg, "service factory must be a function")
 }
@@ -155,7 +155,7 @@ func (suite *RegistrationErrorSuite) TestMessage() {
 	msg := err.Error()
 
 	// Assert
-	suite.Contains(msg, "di: container registration failed:")
+	suite.Contains(msg, "ordo: container registration failed:")
 	suite.Contains(msg, "\n  - option 0: service factory must be a function")
 	suite.Contains(msg, "\n  - option 1: service factory must return at least one value")
 }
@@ -198,7 +198,7 @@ type registrationFaultCase struct {
 }
 
 // ContainerRegistrationSuite is the suite for testing the registration phase of
-// the NewContainer function
+// the New function
 type ContainerRegistrationSuite struct {
 	suite.Suite
 }
@@ -257,7 +257,7 @@ func (suite *ContainerRegistrationSuite) TestFaultCoverage() {
 	for _, tc := range cases {
 		suite.Run(tc.Name, func() {
 			// Act
-			c, err := NewContainer(tc.Opt)
+			c, err := New(tc.Opt)
 
 			// Assert
 			suite.Nil(c)
@@ -267,7 +267,7 @@ func (suite *ContainerRegistrationSuite) TestFaultCoverage() {
 			suite.Require().ErrorAs(err, &regErr)
 			suite.Len(regErr.Faults, 1)
 			suite.ErrorIs(err, tc.Cause)
-			suite.Contains(err.Error(), "di: container registration failed:")
+			suite.Contains(err.Error(), "ordo: container registration failed:")
 
 			var invalid *InvalidRegistrationError
 			suite.Require().ErrorAs(err, &invalid)
@@ -282,7 +282,7 @@ func (suite *ContainerRegistrationSuite) TestFaultCoverage() {
 func (suite *ContainerRegistrationSuite) TestNilRegistrationDoesNotPanic() {
 	// Act & Assert
 	suite.NotPanics(func() {
-		c, err := NewContainer(WithService[testRepository](nil))
+		c, err := New(WithService[testRepository](nil))
 
 		suite.Nil(c)
 		suite.ErrorIs(err, ErrNilRegistration)
@@ -293,7 +293,7 @@ func (suite *ContainerRegistrationSuite) TestNilRegistrationDoesNotPanic() {
 // construction is reported, tagged with its own option index
 func (suite *ContainerRegistrationSuite) TestReportsEveryFault() {
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithFactory("not a factory"),
 		WithService[testRepository](newTestRepository),
 		WithFactory(func() {}),
@@ -326,7 +326,7 @@ func (suite *ContainerRegistrationSuite) TestFaultsReportTheRegistrationSite() {
 	opt, optLine := badRegistrationFromHelper()
 
 	// Act
-	_, err := NewContainer(opt)
+	_, err := New(opt)
 	_, _, containerLine, _ := runtime.Caller(0)
 
 	// Assert
@@ -346,7 +346,7 @@ func (suite *ContainerRegistrationSuite) TestSameServiceTypeFaultsAreDistinguish
 	second := WithService[testRepository](&testService{})
 
 	// Act
-	_, err := NewContainer(first, second)
+	_, err := New(first, second)
 
 	// Assert
 	var regErr *RegistrationError
@@ -367,7 +367,7 @@ func (suite *ContainerRegistrationSuite) TestSameServiceTypeFaultsAreDistinguish
 // the verification faults its own dropped registration would cause
 func (suite *ContainerRegistrationSuite) TestRegistrationFaultsSkipVerification() {
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository]("not a factory"),
 		WithFactory(newTestService),
 	)
@@ -385,14 +385,14 @@ func (suite *ContainerRegistrationSuite) TestRegistrationFaultsSkipVerification(
 
 	var missing *MissingDependencyError
 	suite.False(errors.As(err, &missing))
-	suite.NotContains(err.Error(), "di: container verification failed:")
+	suite.NotContains(err.Error(), "ordo: container verification failed:")
 }
 
 // TestFaultyGraphStillReportsVerification tests a sound registration set with a
 // faulty graph is still reported by verification
 func (suite *ContainerRegistrationSuite) TestFaultyGraphStillReportsVerification() {
 	// Act
-	c, err := NewContainer(WithFactory(newTestService))
+	c, err := New(WithFactory(newTestService))
 
 	// Assert
 	suite.Nil(c)
@@ -411,7 +411,7 @@ func (suite *ContainerRegistrationSuite) TestNoFactoryIsCalled() {
 	repoCalls, serviceCalls := 0, 0
 
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() testRepository {
 			repoCalls++
 			return &testRepositoryImpl{}
@@ -434,7 +434,7 @@ func (suite *ContainerRegistrationSuite) TestNoFactoryIsCalled() {
 // construct a usable Container
 func (suite *ContainerRegistrationSuite) TestSoundRegistrationsConstruct() {
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](newTestRepository),
 		WithFactory(newTestService),
 		WithKeyedValue[testLogger]("main", &testLoggerImpl{}),
@@ -453,7 +453,7 @@ func (suite *ContainerRegistrationSuite) TestSoundRegistrationsConstruct() {
 	suite.NotNil(logger)
 }
 
-// TestContainerRegistration tests the registration phase of NewContainer
+// TestContainerRegistration tests the registration phase of New
 func TestContainerRegistration(t *testing.T) {
 	suite.Run(t, new(ContainerRegistrationSuite))
 }

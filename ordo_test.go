@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"bytes"
@@ -8,288 +8,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
-
-// WithServiceSuite is the suite for testing the WithService function
-type WithServiceSuite struct {
-	suite.Suite
-}
-
-// TestInstance tests the instance service
-func (suite *WithServiceSuite) TestInstance() {
-	// Arrange
-	inst := "test"
-
-	opt := WithService[string](inst)
-	c, err := NewContainer(opt)
-	suite.Require().NoError(err)
-
-	id := serviceIdentifier{
-		Type: reflect.TypeOf(inst),
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	suite.Equal(id, lastAccessor.id)
-	suite.Equal(c, lastAccessor.cont)
-	suite.Nil(lastAccessor.factory)
-	suite.Equal(inst, lastAccessor.instance.Interface())
-	suite.NoError(lastAccessor.err)
-}
-
-// TestInstance tests the instance service
-func (suite *WithServiceSuite) TestFactory() {
-	// Arrange
-	inst := "test"
-	f := func() string {
-		return inst
-	}
-
-	opt := WithService[string](f)
-	c, err := NewContainer(opt)
-	suite.Require().NoError(err)
-
-	id := serviceIdentifier{
-		Type: reflect.TypeOf(inst),
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	suite.Equal(id, lastAccessor.id)
-	suite.Equal(c, lastAccessor.cont)
-	suite.NotNil(lastAccessor.factory)
-	suite.Nil(lastAccessor.instance)
-	suite.NoError(lastAccessor.err)
-}
-
-// TestWithService tests the WithService function
-func TestWithService(t *testing.T) {
-	suite.Run(t, new(WithServiceSuite))
-}
-
-// WithKeyedServiceSuite is the suite for testing the WithKeyedService function
-type WithKeyedServiceSuite struct {
-	suite.Suite
-}
-
-// TestInstance tests the instance service
-func (suite *WithKeyedServiceSuite) TestInstance() {
-	// Arrange
-	key := "key"
-	inst := "test"
-
-	opt := WithKeyedService[string](key, inst)
-	c, err := NewContainer(opt)
-	suite.Require().NoError(err)
-
-	id := serviceIdentifier{
-		Type:   reflect.TypeOf(inst),
-		Key:    key,
-		HasKey: true,
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	suite.Equal(id, lastAccessor.id)
-	suite.Equal(c, lastAccessor.cont)
-	suite.Nil(lastAccessor.factory)
-	suite.Equal(inst, lastAccessor.instance.Interface())
-	suite.NoError(lastAccessor.err)
-}
-
-// TestInstance tests the instance service
-func (suite *WithKeyedServiceSuite) TestFactory() {
-	// Arrange
-	key := "key"
-	inst := "test"
-	f := func() string {
-		return inst
-	}
-
-	opt := WithKeyedService[string](key, f)
-	c, err := NewContainer(opt)
-	suite.Require().NoError(err)
-
-	id := serviceIdentifier{
-		Type:   reflect.TypeOf(inst),
-		Key:    key,
-		HasKey: true,
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	suite.Equal(id, lastAccessor.id)
-	suite.Equal(c, lastAccessor.cont)
-	suite.NotNil(lastAccessor.factory)
-	suite.Nil(lastAccessor.instance)
-	suite.NoError(lastAccessor.err)
-}
-
-// TestWithKeyedService tests the WithKeyedService function
-func TestWithKeyedService(t *testing.T) {
-	suite.Run(t, new(WithKeyedServiceSuite))
-}
-
-// TestWithValue tests the WithValue function
-func TestWithValue(t *testing.T) {
-	// Arrange
-	inst := "test"
-
-	opt := WithValue(inst)
-	c, err := NewContainer(opt)
-	require.NoError(t, err)
-
-	id := serviceIdentifier{
-		Type: reflect.TypeOf(inst),
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	assert.Equal(t, id, lastAccessor.id)
-	assert.Equal(t, c, lastAccessor.cont)
-	assert.Nil(t, lastAccessor.factory)
-	assert.Equal(t, inst, lastAccessor.instance.Interface())
-	assert.NoError(t, lastAccessor.err)
-}
-
-// TestWithKeyedValue tests the WithKeyedValue function
-func TestWithKeyedValue(t *testing.T) {
-	// Arrange
-	key := "key"
-	inst := "test"
-
-	opt := WithKeyedValue[string](key, inst)
-	c, err := NewContainer(opt)
-	require.NoError(t, err)
-
-	id := serviceIdentifier{
-		Type:   reflect.TypeOf(inst),
-		Key:    key,
-		HasKey: true,
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-
-	// Assert
-	assert.Equal(t, id, lastAccessor.id)
-	assert.Equal(t, c, lastAccessor.cont)
-	assert.Nil(t, lastAccessor.factory)
-	assert.Equal(t, inst, lastAccessor.instance.Interface())
-	assert.NoError(t, lastAccessor.err)
-}
-
-// TestWithFactory tests the WithFactory function
-func TestWithFactory(t *testing.T) {
-	// Arrange
-	inst := "test"
-	f := func() string {
-		return inst
-	}
-
-	opt := WithFactory(f)
-	c, err := NewContainer(opt)
-	require.NoError(t, err)
-
-	id := serviceIdentifier{
-		Type: reflect.TypeOf(inst),
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-	res, err := lastAccessor.factory.Call()
-
-	// Assert
-	assert.Equal(t, id, lastAccessor.id)
-	assert.Equal(t, c, lastAccessor.cont)
-	assert.Nil(t, lastAccessor.instance)
-	assert.NotNil(t, lastAccessor.factory)
-	assert.NoError(t, lastAccessor.err)
-
-	assert.Equal(t, inst, res.Interface())
-	assert.NoError(t, err)
-}
-
-// TestWithKeyedFactory tests the WithKeyedFactory function
-func TestWithKeyedFactory(t *testing.T) {
-	// Arrange
-	key := "key"
-	inst := "test"
-	f := func() string {
-		return inst
-	}
-
-	opt := WithKeyedFactory(key, f)
-	c, err := NewContainer(opt)
-	require.NoError(t, err)
-
-	id := serviceIdentifier{
-		Type:   reflect.TypeOf(inst),
-		Key:    key,
-		HasKey: true,
-	}
-
-	// Act
-	lastAccessor := c.accessors[id].Last()
-	res, err := lastAccessor.factory.Call()
-
-	// Assert
-	assert.Equal(t, id, lastAccessor.id)
-	assert.Equal(t, c, lastAccessor.cont)
-	assert.Nil(t, lastAccessor.instance)
-	assert.NotNil(t, lastAccessor.factory)
-	assert.NoError(t, lastAccessor.err)
-
-	assert.Equal(t, inst, res.Interface())
-	assert.NoError(t, err)
-}
-
-// TestMultiple tests the adding multiple services with the same identifier
-func TestMultiple(t *testing.T) {
-	// Arrange
-	inst1, inst2 := "test1", "test2"
-	opt1, opt2 := WithValue(inst1), WithValue(inst2)
-
-	id := serviceIdentifier{
-		Type: reflect.TypeFor[string](),
-	}
-
-	// Act
-	c, err := NewContainer(opt1, opt2)
-	require.NoError(t, err)
-
-	res := make([]*serviceAccessor, 0, 2)
-	for _, a := range c.accessors[id].Iter() {
-		res = append(res, a)
-	}
-
-	// Assert
-	if assert.Equal(t, 2, len(res)) {
-		assert.Equal(t, inst2, res[1].instance.Interface())
-		assert.Equal(t, inst1, res[0].instance.Interface())
-	}
-}
-
-// NewContainerSuite is the suite for testing the NewContainer function
-type NewContainerSuite struct {
+// NewSuite is the suite for testing the New function
+type NewSuite struct {
 	suite.Suite
 }
 
 // TestSoundGraph tests a sound graph yields a usable Container and no error
-func (suite *NewContainerSuite) TestSoundGraph() {
+func (suite *NewSuite) TestSoundGraph() {
 	// Arrange
 	opts := []Option{
 		WithService[testRepository](newTestRepository),
@@ -298,7 +25,7 @@ func (suite *NewContainerSuite) TestSoundGraph() {
 	}
 
 	// Act
-	c, err := NewContainer(opts...)
+	c, err := New(opts...)
 
 	// Assert
 	suite.Require().NoError(err)
@@ -310,9 +37,9 @@ func (suite *NewContainerSuite) TestSoundGraph() {
 }
 
 // TestEmptyContainer tests a Container with no registrations is sound
-func (suite *NewContainerSuite) TestEmptyContainer() {
+func (suite *NewSuite) TestEmptyContainer() {
 	// Act
-	c, err := NewContainer()
+	c, err := New()
 
 	// Assert
 	suite.NoError(err)
@@ -321,9 +48,9 @@ func (suite *NewContainerSuite) TestEmptyContainer() {
 
 // TestFaultyGraphYieldsNilContainer tests a faulty graph yields a nil Container
 // and a describing error
-func (suite *NewContainerSuite) TestFaultyGraphYieldsNilContainer() {
+func (suite *NewSuite) TestFaultyGraphYieldsNilContainer() {
 	// Act
-	c, err := NewContainer(WithFactory(newTestService))
+	c, err := New(WithFactory(newTestService))
 
 	// Assert
 	suite.Nil(c)
@@ -332,15 +59,15 @@ func (suite *NewContainerSuite) TestFaultyGraphYieldsNilContainer() {
 	var verErr *VerificationError
 	suite.Require().ErrorAs(err, &verErr)
 	suite.Len(verErr.Faults, 1)
-	suite.Contains(err.Error(), "di: container verification failed:")
+	suite.Contains(err.Error(), "ordo: container verification failed:")
 	suite.ErrorIs(err, ErrServiceNotFound)
 }
 
 // TestCycleDoesNotDeadlock tests a cycle is returned as an error instead of
 // deadlocking the process
-func (suite *NewContainerSuite) TestCycleDoesNotDeadlock() {
+func (suite *NewSuite) TestCycleDoesNotDeadlock() {
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithFactory(func(b *testServiceB) *testServiceA { return &testServiceA{b} }),
 		WithFactory(func(a *testServiceA) *testServiceB { return &testServiceB{} }),
 	)
@@ -362,12 +89,12 @@ func (suite *NewContainerSuite) TestCycleDoesNotDeadlock() {
 
 // TestFactoriesNotCalled tests no factory is invoked while the Container is
 // constructed
-func (suite *NewContainerSuite) TestFactoriesNotCalled() {
+func (suite *NewSuite) TestFactoriesNotCalled() {
 	// Arrange
 	repoCalls, serviceCalls, controllerCalls := 0, 0, 0
 
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() testRepository {
 			repoCalls++
 			return &testRepositoryImpl{}
@@ -392,10 +119,10 @@ func (suite *NewContainerSuite) TestFactoriesNotCalled() {
 
 // TestLazySingleton tests a service is created on first resolution and reused
 // afterwards
-func (suite *NewContainerSuite) TestLazySingleton() {
+func (suite *NewSuite) TestLazySingleton() {
 	// Arrange
 	calls := 0
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() testRepository {
 			calls++
 			return &testRepositoryImpl{}
@@ -416,12 +143,12 @@ func (suite *NewContainerSuite) TestLazySingleton() {
 
 // TestFactoryErrorSurfacesOnResolution tests a factory error does not fail the
 // construction and is returned on resolution
-func (suite *NewContainerSuite) TestFactoryErrorSurfacesOnResolution() {
+func (suite *NewSuite) TestFactoryErrorSurfacesOnResolution() {
 	// Arrange
 	calls := 0
 
 	// Act
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() (testRepository, error) {
 			calls++
 			return nil, errors.ErrUnsupported
@@ -441,9 +168,9 @@ func (suite *NewContainerSuite) TestFactoryErrorSurfacesOnResolution() {
 	suite.Equal(1, calls)
 }
 
-// TestNewContainer tests the NewContainer function
-func TestNewContainer(t *testing.T) {
-	suite.Run(t, new(NewContainerSuite))
+// TestNew tests the New function
+func TestNew(t *testing.T) {
+	suite.Run(t, new(NewSuite))
 }
 
 // GetServiceSuite is the suite for testing the GetService function
@@ -458,7 +185,7 @@ func (suite *GetServiceSuite) TestFactory() {
 	f := func() string {
 		return inst
 	}
-	c, err := NewContainer(WithFactory(f))
+	c, err := New(WithFactory(f))
 	suite.Require().NoError(err)
 
 	// Act
@@ -475,7 +202,7 @@ func (suite *GetServiceSuite) TestFactoryError() {
 	f := func() (string, error) {
 		return "", errors.ErrUnsupported
 	}
-	c, err := NewContainer(WithFactory(f))
+	c, err := New(WithFactory(f))
 	suite.Require().NoError(err)
 
 	// Act
@@ -490,7 +217,7 @@ func (suite *GetServiceSuite) TestFactoryError() {
 func (suite *GetServiceSuite) TestInstance() {
 	// Arrange
 	inst := "test"
-	c, err := NewContainer(WithValue(inst))
+	c, err := New(WithValue(inst))
 	suite.Require().NoError(err)
 
 	// Act
@@ -519,7 +246,7 @@ func (suite *GetKeyedServiceSuite) TestFactory() {
 	f := func() string {
 		return inst
 	}
-	c, err := NewContainer(WithKeyedFactory(key, f))
+	c, err := New(WithKeyedFactory(key, f))
 	suite.Require().NoError(err)
 
 	// Act
@@ -537,7 +264,7 @@ func (suite *GetKeyedServiceSuite) TestFactoryError() {
 	f := func() (string, error) {
 		return "", errors.ErrUnsupported
 	}
-	c, err := NewContainer(WithKeyedFactory(key, f))
+	c, err := New(WithKeyedFactory(key, f))
 	suite.Require().NoError(err)
 
 	// Act
@@ -553,7 +280,7 @@ func (suite *GetKeyedServiceSuite) TestInstance() {
 	// Arrange
 	key := "key"
 	inst := "test"
-	c, err := NewContainer(WithKeyedValue(key, inst))
+	c, err := New(WithKeyedValue(key, inst))
 	suite.Require().NoError(err)
 
 	// Act
@@ -581,7 +308,7 @@ func (suite *MustGetServiceSuite) TestFactory() {
 	f := func() string {
 		return inst
 	}
-	c, err := NewContainer(WithFactory(f))
+	c, err := New(WithFactory(f))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -598,7 +325,7 @@ func (suite *MustGetServiceSuite) TestFactoryError() {
 	f := func() (string, error) {
 		return "", errors.ErrUnsupported
 	}
-	c, err := NewContainer(WithFactory(f))
+	c, err := New(WithFactory(f))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -611,7 +338,7 @@ func (suite *MustGetServiceSuite) TestFactoryError() {
 func (suite *MustGetServiceSuite) TestInstance() {
 	// Arrange
 	inst := "test"
-	c, err := NewContainer(WithValue(inst))
+	c, err := New(WithValue(inst))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -640,7 +367,7 @@ func (suite *MustGetKeyedServiceSuite) TestFactory() {
 	f := func() string {
 		return inst
 	}
-	c, err := NewContainer(WithKeyedFactory(key, f))
+	c, err := New(WithKeyedFactory(key, f))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -658,7 +385,7 @@ func (suite *MustGetKeyedServiceSuite) TestFactoryError() {
 	f := func() (string, error) {
 		return "", errors.ErrUnsupported
 	}
-	c, err := NewContainer(WithKeyedFactory(key, f))
+	c, err := New(WithKeyedFactory(key, f))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -672,7 +399,7 @@ func (suite *MustGetKeyedServiceSuite) TestInstance() {
 	// Arrange
 	key := "key"
 	inst := "test"
-	c, err := NewContainer(WithKeyedValue(key, inst))
+	c, err := New(WithKeyedValue(key, inst))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -784,7 +511,7 @@ func (suite *VerificationAgreementSuite) TestAgreement() {
 		suite.Run(tc.Name, func() {
 			// Arrange
 			// newContainer skips verification, so the resolution attempt runs
-			// even on a graph NewContainer would reject
+			// even on a graph New would reject
 			c := newFixtureContainer(tc.Opts...)
 
 			// Act
@@ -819,7 +546,7 @@ type ResolutionErrorSuite struct {
 // as an error instead of panicking on the type assertion
 func (suite *ResolutionErrorSuite) TestUnregisteredInterface() {
 	// Arrange
-	c, err := NewContainer()
+	c, err := New()
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -835,7 +562,7 @@ func (suite *ResolutionErrorSuite) TestUnregisteredInterface() {
 // error instead of panicking on the type assertion
 func (suite *ResolutionErrorSuite) TestUnregisteredKeyedInterface() {
 	// Arrange
-	c, err := NewContainer(WithService[testRepository](newTestRepository))
+	c, err := New(WithService[testRepository](newTestRepository))
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -851,7 +578,7 @@ func (suite *ResolutionErrorSuite) TestUnregisteredKeyedInterface() {
 // reported as an error instead of panicking on the type assertion
 func (suite *ResolutionErrorSuite) TestInterfaceFactoryError() {
 	// Arrange
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() (testRepository, error) {
 			return nil, errors.ErrUnsupported
 		}),
@@ -871,7 +598,7 @@ func (suite *ResolutionErrorSuite) TestInterfaceFactoryError() {
 // reported as an error instead of panicking on the type assertion
 func (suite *ResolutionErrorSuite) TestUnregisteredInterfaceSlice() {
 	// Arrange
-	c, err := NewContainer()
+	c, err := New()
 	suite.Require().NoError(err)
 
 	// Act & Assert
@@ -887,7 +614,7 @@ func (suite *ResolutionErrorSuite) TestUnregisteredInterfaceSlice() {
 // resolves with no error
 func (suite *ResolutionErrorSuite) TestRegisteredInterfaceResolves() {
 	// Arrange
-	c, err := NewContainer(WithService[testRepository](newTestRepository))
+	c, err := New(WithService[testRepository](newTestRepository))
 	suite.Require().NoError(err)
 
 	// Act
@@ -939,7 +666,7 @@ func (suite *MustPanicPayloadSuite) recoverPanic(f func()) (recovered any) {
 // returning resolution reports
 func (suite *MustPanicPayloadSuite) TestPanicsWithResolutionError() {
 	// Arrange
-	c, err := NewContainer(
+	c, err := New(
 		WithService[testRepository](func() (testRepository, error) {
 			return nil, errors.ErrUnsupported
 		}),
@@ -966,7 +693,7 @@ func (suite *MustPanicPayloadSuite) TestPanicsWithResolutionError() {
 // error the error returning resolution reports
 func (suite *MustPanicPayloadSuite) TestKeyedPanicsWithResolutionError() {
 	// Arrange
-	c, err := NewContainer(WithService[testRepository](newTestRepository))
+	c, err := New(WithService[testRepository](newTestRepository))
 	suite.Require().NoError(err)
 
 	_, expected := c.GetKeyedService[testRepository]("missing")
@@ -988,7 +715,7 @@ func (suite *MustPanicPayloadSuite) TestKeyedPanicsWithResolutionError() {
 // without panicking and without log output
 func (suite *MustPanicPayloadSuite) TestResolvedServiceDoesNotPanic() {
 	// Arrange
-	c, err := NewContainer(WithService[testRepository](newTestRepository))
+	c, err := New(WithService[testRepository](newTestRepository))
 	suite.Require().NoError(err)
 
 	// Act

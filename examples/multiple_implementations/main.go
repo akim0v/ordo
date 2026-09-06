@@ -10,18 +10,18 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/akim0v/ordo/di"
+	"github.com/akim0v/ordo"
 )
 
 func main() {
-	c, err := di.NewContainer(
+	c, err := ordo.New(
 		// Two implementations of the same interface.
-		di.WithService[UserRepository](NewCacheRepositoryImpl),
-		di.WithService[UserRepository](NewDBRepositoryImpl),
+		ordo.WithService[UserRepository](NewCacheRepositoryImpl),
+		ordo.WithService[UserRepository](NewDBRepositoryImpl),
 
 		// NewUserService takes []UserRepository and receives both, in the order
 		// they were registered above.
-		di.WithFactory(NewUserService),
+		ordo.WithFactory(NewUserService),
 	)
 	if err != nil {
 		log.Fatalf("could not create the container: %s", err)

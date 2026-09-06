@@ -3,7 +3,7 @@
 // This is the guarantee ordo is built around: a container either fails to
 // build, or is fully resolvable. Once every registration is well formed, the
 // container walks the whole dependency graph before returning, so a missing
-// dependency or a cycle is reported at NewContainer instead of surfacing on the
+// dependency or a cycle is reported at New instead of surfacing on the
 // first resolution in production.
 package main
 
@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/akim0v/ordo/di"
+	"github.com/akim0v/ordo"
 )
 
 type UserRepository interface {
@@ -41,25 +41,25 @@ func missingDependency() {
 	fmt.Println("=== missing dependency ===")
 
 	// UserService is registered, its UserRepository dependency is not.
-	_, err := di.NewContainer(
-		di.WithFactory(NewUserService),
+	_, err := ordo.New(
+		ordo.WithFactory(NewUserService),
 	)
 
 	fmt.Println(err)
-	// di: container verification failed:
+	// ordo: container verification failed:
 	//   - service "*main.UserService" requires "main.UserRepository", which is not registered
 
 	// A missing dependency wraps the same sentinel a failed runtime resolution
 	// would return.
-	fmt.Println(errors.Is(err, di.ErrServiceNotFound)) // true
+	fmt.Println(errors.Is(err, ordo.ErrServiceNotFound)) // true
 
 	// Every fault of the pass is aggregated and reachable with errors.As.
-	var verification *di.VerificationError
+	var verification *ordo.VerificationError
 	if errors.As(err, &verification) {
 		fmt.Printf("faults: %d\n", len(verification.Faults))
 	}
 
-	var missing *di.MissingDependencyError
+	var missing *ordo.MissingDependencyError
 	if errors.As(err, &missing) {
 		fmt.Printf("%s is missing %s\n", missing.RequestingType, missing.DependencyType)
 	}
@@ -69,16 +69,16 @@ func circularDependency() {
 	fmt.Println("=== circular dependency ===")
 
 	// Billing needs Accounts, Accounts needs Billing. Neither can ever be built.
-	_, err := di.NewContainer(
-		di.WithFactory(NewBilling),
-		di.WithFactory(NewAccounts),
+	_, err := ordo.New(
+		ordo.WithFactory(NewBilling),
+		ordo.WithFactory(NewAccounts),
 	)
 
 	fmt.Println(err)
 
 	// The fault carries the ordered cycle, so the offending edge is readable
 	// rather than guessed at.
-	var cycle *di.CircularDependencyError
+	var cycle *ordo.CircularDependencyError
 	if errors.As(err, &cycle) {
 		for i, typ := range cycle.Cycle {
 			fmt.Printf("  %d. %s\n", i+1, typ)

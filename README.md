@@ -1,7 +1,7 @@
 # Ordo
 
-**Ordo** is an application framework for Go. Its first component is `di`, a dependency
-injection container that keeps your wiring explicit and verifies it before it hands you
+**Ordo** is a dependency injection container for Go. Wiring is explicit, dependencies are
+read from your constructors, and the whole graph is verified before the container hands you
 anything.
 
 ## Why Ordo
@@ -14,7 +14,7 @@ system and into a convention you have to remember.
 Ordo takes the opposite position. Registration is a plain generic call:
 
 ```go
-di.WithService[UserRepository](storage.NewPostgresUserRepository)
+ordo.WithService[UserRepository](storage.NewPostgresUserRepository)
 ```
 
 The compiler already knows the service type and the constructor. No tags, no code
@@ -22,9 +22,9 @@ generation, no build step, and no string names unless you deliberately ask for o
 Dependencies are read from the constructor's own parameter types.
 
 Because the container knows the entire graph before it resolves a single service, it checks
-that graph up front. `di.NewContainer` validates every registration, then verifies every
-edge, and returns what it found — a malformed registration, a missing dependency, a cycle —
-at the call site, with the `file:line` of the registration responsible.
+that graph up front. `ordo.New` validates every registration, then verifies every edge, and
+returns what it found — a malformed registration, a missing dependency, a cycle — at the call
+site, with the `file:line` of the registration responsible.
 
 That is the guarantee the name stands for. **A container either fails to build, or is fully
 resolvable.** Nothing is deferred to the first request in production.
@@ -33,13 +33,13 @@ In practice:
 
 - No code generation and no build step.
 - No struct tags and no reflection-driven field injection.
-- `NewContainer` never panics. Failures are ordinary Go errors, classified with `errors.Is`
-  and `errors.As`.
+- `ordo.New` never panics. Failures are ordinary Go errors, classified with `errors.Is` and
+  `errors.As`.
 - The dependency graph is verified once, at construction.
 
 ## Installation
 
-Ordo requires **Go 1.27 or newer**. Add it to an existing module:
+Ordo requires **Go 1.27 or newer**.
 
 ```bash
 go get -u github.com/akim0v/ordo
@@ -53,7 +53,7 @@ package main
 import (
 	"log"
 
-	"github.com/akim0v/ordo/di"
+	"github.com/akim0v/ordo"
 
 	"github.com/you/app/config"
 	"github.com/you/app/rest"
@@ -62,22 +62,22 @@ import (
 )
 
 func main() {
-	c, err := di.NewContainer(
+	c, err := ordo.New(
 		// Register a constructor against the interface it satisfies.
 		// usecase.UserRepo is the interface usecase.NewUserService depends on;
 		// storage.NewUserRepo is the constructor that implements it.
-		di.WithService[usecase.UserRepo](storage.NewUserRepo),
+		ordo.WithService[usecase.UserRepo](storage.NewUserRepo),
 
 		// Register a ready-made value under its own type.
-		// Equivalent to di.WithService[*config.Config](config.New()).
-		di.WithValue(config.New()),
+		// Equivalent to ordo.WithService[*config.Config](config.New()).
+		ordo.WithValue(config.New()),
 
 		// Register a constructor under its return type.
-		// Equivalent to di.WithService[*usecase.UserService](usecase.NewUserService).
-		di.WithFactory(usecase.NewUserService),
+		// Equivalent to ordo.WithService[*usecase.UserService](usecase.NewUserService).
+		ordo.WithFactory(usecase.NewUserService),
 
 		// rest.NewUserController takes a *usecase.UserService; the container supplies it.
-		di.WithService[rest.Controller](rest.NewUserController),
+		ordo.WithService[rest.Controller](rest.NewUserController),
 	)
 	if err != nil {
 		log.Fatalf("could not create the container: %s", err)
@@ -96,9 +96,9 @@ Runnable versions of this and other setups live in [`examples/`](./examples).
 
 | Option | Service type | Source |
 | --- | --- | --- |
-| `di.WithService[T](factoryOrInstance)` | `T`, given explicitly | a constructor or a ready value |
-| `di.WithFactory(factory)` | the factory's return type | a constructor |
-| `di.WithValue(value)` | the value's own type | a ready value |
+| `ordo.WithService[T](factoryOrInstance)` | `T`, given explicitly | a constructor or a ready value |
+| `ordo.WithFactory(factory)` | the factory's return type | a constructor |
+| `ordo.WithValue(value)` | the value's own type | a ready value |
 
 `WithService` accepts either form and tells them apart by kind, so it is the option to reach
 for when the service type differs from the concrete type — registering an implementation
@@ -106,7 +106,8 @@ against an interface, most often.
 
 Each option has a keyed counterpart — `WithKeyedService`, `WithKeyedFactory`,
 `WithKeyedValue` — for the case where one type has several registrations that callers need
-to tell apart by name.
+to tell apart by name. Keys are a call-site facility: a factory parameter is always resolved
+without a key, so a keyed registration never satisfies a constructor.
 
 A constructor may return `(T, error)`. The container propagates a construction failure to
 the caller resolving that service.
@@ -118,12 +119,12 @@ registrations, and a dependency declared as a slice receives all of them, in reg
 order:
 
 ```go
-c, err := di.NewContainer(
-	di.WithService[UserRepository](NewCacheRepository),
-	di.WithService[UserRepository](NewDBRepository),
+c, err := ordo.New(
+	ordo.WithService[UserRepository](NewCacheRepository),
+	ordo.WithService[UserRepository](NewDBRepository),
 
 	// NewUserService takes []UserRepository and receives both.
-	di.WithFactory(NewUserService),
+	ordo.WithFactory(NewUserService),
 )
 ```
 
@@ -140,26 +141,28 @@ svc, err := c.GetKeyedService[Cache]("redis")
 svc := c.MustGetKeyedService[Cache]("redis")
 ```
 
-Resolution failures are the sentinels `di.ErrServiceNotFound` and
-`di.ErrServiceTypeMismatch`. The `MustGet*` accessors panic — as their name says — with the
+Services are resolved lazily and each registration is constructed once.
+
+Resolution failures are the sentinels `ordo.ErrServiceNotFound` and
+`ordo.ErrServiceTypeMismatch`. The `MustGet*` accessors panic — as their name says — with the
 exact error the matching `Get*` method returns, so a recovering caller can inspect it with
 `errors.Is` and `errors.As`.
 
 ## Container construction errors
 
-`di.NewContainer` never panics. It reports in two phases and returns the first that fails.
+`ordo.New` never panics. It reports in two phases and returns the first that fails.
 
 **Registration.** A malformed option — a factory that is not a function, a factory returning
 no value or a non-error second value, a return type or an instance not assignable to the
-service type, a nil value — is returned as a `*di.RegistrationError`. It aggregates every
+service type, a nil value — is returned as a `*ordo.RegistrationError`. It aggregates every
 malformed registration in the call, and each fault names the option index, the types
-involved, and the `file:line` of the `di.With*` call that created it. Each fault wraps one of
-the exported sentinels:
+involved, and the `file:line` of the `ordo.With*` call that created it. Each fault wraps one
+of the exported sentinels:
 
 ```go
-var invalid *di.InvalidRegistrationError
+var invalid *ordo.InvalidRegistrationError
 
-if errors.Is(err, di.ErrFactoryNotFunction) { /* classify */ }
+if errors.Is(err, ordo.ErrFactoryNotFunction) { /* classify */ }
 if errors.As(err, &invalid) { /* read Site, ServiceType, ValueType */ }
 ```
 
@@ -173,17 +176,16 @@ if errors.As(err, &invalid) { /* read Site, ServiceType, ValueType */ }
 | `ErrNotAssignable` | the return type or instance is not assignable to the service type |
 
 **Verification.** Once every registration is sound, the dependency graph is checked, and
-every missing dependency and every cycle is returned as a `*di.VerificationError`
-aggregating `*di.MissingDependencyError` and `*di.CircularDependencyError` faults.
+every missing dependency and every cycle is returned as a `*ordo.VerificationError`
+aggregating `*ordo.MissingDependencyError` and `*ordo.CircularDependencyError` faults.
 
 Verification is skipped when registration fails: a rejected registration is absent from the
 graph and would report dependencies missing only because of it.
 
 ## Status
 
-`di` is the foundation the rest of the framework will be built on. Routing, application
-lifecycle, and modules are next. The container's API is settling but not yet frozen — pin a
-version.
+Ordo does one thing — dependency injection — and is not growing into a web framework. The
+API is settling but not yet frozen, so pin a version.
 
 ## License
 

@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"fmt"
@@ -60,7 +60,7 @@ func (e *CircularDependencyError) Error() string {
 	return fmt.Sprintf("circular dependency: %s", strings.Join(names, " -> "))
 }
 
-// VerificationError is the error returned by NewContainer when the registration
+// VerificationError is the error returned by New when the registration
 // graph contains one or more faults.
 //
 // It aggregates every fault found in a single verification pass. Faults are
@@ -74,7 +74,7 @@ type VerificationError struct {
 // Error implements the error interface for VerificationError.
 func (e *VerificationError) Error() string {
 	var sb strings.Builder
-	sb.WriteString("di: container verification failed:")
+	sb.WriteString("ordo: container verification failed:")
 
 	for _, fault := range e.Faults {
 		sb.WriteString("\n  - ")

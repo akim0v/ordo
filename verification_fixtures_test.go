@@ -1,4 +1,4 @@
-package di
+package ordo
 
 // newFixtureContainer builds an unverified Container from fixture
 // registrations.

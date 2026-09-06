@@ -1,4 +1,4 @@
-package di
+package ordo
 
 import (
 	"reflect"
@@ -53,8 +53,8 @@ func (suite *MissingDependencyErrorSuite) TestMessage() {
 	msg := fault.Error()
 
 	// Assert
-	suite.Contains(msg, "di.testService")
-	suite.Contains(msg, "di.testRepository")
+	suite.Contains(msg, "ordo.testService")
+	suite.Contains(msg, "ordo.testRepository")
 }
 
 // TestMissingDependencyError tests the MissingDependencyError type
@@ -98,9 +98,9 @@ func (suite *CircularDependencyErrorSuite) TestMessage() {
 	msg := fault.Error()
 
 	// Assert
-	suite.Contains(msg, "di.testServiceA")
-	suite.Contains(msg, "di.testServiceB")
-	suite.Contains(msg, "di.testServiceC")
+	suite.Contains(msg, "ordo.testServiceA")
+	suite.Contains(msg, "ordo.testServiceB")
+	suite.Contains(msg, "ordo.testServiceC")
 	suite.Contains(msg, "circular dependency")
 }
 
@@ -119,7 +119,7 @@ func (suite *CircularDependencyErrorSuite) TestMessageClosesCycle() {
 
 	// Assert
 	suite.Equal(
-		"circular dependency: *di.testServiceA -> *di.testServiceB -> *di.testServiceA",
+		"circular dependency: *ordo.testServiceA -> *ordo.testServiceB -> *ordo.testServiceA",
 		msg,
 	)
 }
@@ -183,9 +183,9 @@ func (suite *VerificationErrorSuite) TestMessage() {
 	msg := err.Error()
 
 	// Assert
-	suite.Contains(msg, "di: container verification failed:")
-	suite.Contains(msg, "\n  - service \"*di.testService\" requires \"di.testRepository\", which is not registered")
-	suite.Contains(msg, "\n  - circular dependency: *di.testServiceA -> *di.testServiceB -> *di.testServiceA")
+	suite.Contains(msg, "ordo: container verification failed:")
+	suite.Contains(msg, "\n  - service \"*ordo.testService\" requires \"ordo.testRepository\", which is not registered")
+	suite.Contains(msg, "\n  - circular dependency: *ordo.testServiceA -> *ordo.testServiceB -> *ordo.testServiceA")
 }
 
 // TestUnwrap tests every fault is exposed for programmatic inspection
