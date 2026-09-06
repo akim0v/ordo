@@ -21,8 +21,11 @@ TIMEOUT="${ORDO_EVAL_TIMEOUT:-300}"
 RESULTS="$(mktemp -d)/results.tsv"
 KEPT="$(dirname "$RESULTS")/kept-workspaces.txt"
 
-# The library the tasks compile against is a snapshot with evals/ removed, so an
-# agent cannot read the reference solutions through the replace directive.
+# The library the tasks compile against is a snapshot with evals/ removed, so the
+# reference solutions are unreachable while the documentation is not. It is
+# copied into each workspace rather than kept beside it: a sandboxed agent can
+# only read paths under its working directory, and an agent that cannot read the
+# package documentation is not being measured on the documentation.
 SNAPSHOT="$(mktemp -d)/ordo"
 mkdir -p "$SNAPSHOT"
 tar -C "$REPO" --exclude=evals --exclude=.git --exclude=.idea --exclude=.claude -cf - . \
@@ -31,8 +34,11 @@ tar -C "$REPO" --exclude=evals --exclude=.git --exclude=.idea --exclude=.claude 
 # run_with_timeout runs a command in the background and kills it after N
 # seconds. macOS ships no timeout(1), so this is done by hand.
 run_with_timeout() {
-  local seconds="$1"; shift
-  "$@" &
+  local seconds="$1" stdin_file="$2"; shift 2
+
+  # Backgrounding a job in a non-interactive shell points its stdin at
+  # /dev/null, so the prompt is restored from a file rather than inherited.
+  "$@" < "$stdin_file" &
   local pid=$!
 
   ( sleep "$seconds"; kill -TERM "$pid" 2>/dev/null ) &
@@ -44,11 +50,15 @@ run_with_timeout() {
   return "$status"
 }
 
+# agent runs the model under test. The prompt arrives both as an argument and
+# on stdin, so a replacement command may take it either way.
 agent() {
+  local prompt="$1"
+
   if [[ -n "${ORDO_EVAL_AGENT:-}" ]]; then
     $ORDO_EVAL_AGENT
   else
-    claude -p --permission-mode acceptEdits --model "$MODEL" "$(cat)"
+    claude -p --permission-mode bypassPermissions --model "$MODEL" "$prompt"
   fi
 }
 
@@ -60,7 +70,8 @@ grade() {
   cp "$task/domain.go" "$work/domain.go" 2>/dev/null
   cp "$task/verify_test.go" "$work/verify_test.go"
 
-  (cd "$work" && go build ./... 2>&1 && go vet ./... 2>&1 && go test ./... 2>&1)
+  # . rather than ./... so the vendored library copy under .ordo is not graded
+  (cd "$work" && go build . 2>&1 && go vet . 2>&1 && go test . 2>&1)
 }
 
 printf 'task\tfirst_attempt\titerations\tfinal\tdetail\n' > "$RESULTS"
@@ -78,6 +89,10 @@ for task in "$REPO"/evals/tasks/*/; do
   work="$(mktemp -d)"
   cp "$task"/* "$work"/
 
+  # The library lives inside the workspace so the agent can read its docs.
+  mkdir -p "$work/.ordo"
+  cp -R "$SNAPSHOT"/. "$work/.ordo"/
+
   # Written rather than edited in place, so the script does not depend on a
   # particular sed dialect.
   cat > "$work/go.mod" <<GOMOD
@@ -87,7 +102,7 @@ go 1.27.0
 
 require github.com/akim0v/ordo v0.0.0
 
-replace github.com/akim0v/ordo => $SNAPSHOT
+replace github.com/akim0v/ordo => ./.ordo
 GOMOD
 
   # The verification test is hidden while the agent works: the prompt states the
@@ -100,7 +115,8 @@ GOMOD
   for (( round=0; round<=ROUNDS; round++ )); do
     # The agent's output is kept rather than discarded: when a task fails it is
     # the only evidence of whether the agent stalled, errored or ran out of turns.
-    ( cd "$work" && printf '%s\n' "$prompt" | run_with_timeout "$TIMEOUT" agent ) \
+    printf '%s\n' "$prompt" > "$work/.prompt"
+    ( cd "$work" && run_with_timeout "$TIMEOUT" "$work/.prompt" agent "$prompt" ) \
       > "$work/agent-round$round.log" 2>&1
     agent_status=$?
 
